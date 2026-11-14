@@ -221,7 +221,10 @@ main > .sec > .rays { position: absolute; inset: 0; z-index: -1; pointer-events:
 .strip-edit { position: absolute; left: -2px; top: 1px; width: calc(100% + 4px); height: 18px; padding: 0 1px; border: 1px solid var(--strong); border-radius: 3px; background: var(--bg); color: var(--text); font: inherit; line-height: 16px; outline: none; }
 /* A list, as the plugin's popup menus are: its panel, 19 px rows of 14.4 px text inset past a tick's gutter, the ticked
    row bold with its tick, and it and the row under the pointer washed in the mid amber. */
-.menu { position: absolute; z-index: 60; padding: 4px 0; background: var(--bg); border: 1.5px solid var(--grid); border-radius: 8px; box-shadow: 0 8px 22px rgba(0, 0, 0, .5); }
+/* A list on the page goes behind the bar and the rail (30), as the control it's under does; one opened from the bar is
+   fixed with it, over everything (openMenu). */
+.menu { position: absolute; z-index: 20; padding: 4px 0; background: var(--bg); border: 1.5px solid var(--grid); border-radius: 8px; box-shadow: 0 8px 22px rgba(0, 0, 0, .5); }
+.menu.pinned { position: fixed; z-index: 60; }
 .menu button { position: relative; display: block; width: 100%; height: 19px; padding: 0 10px 0 32px; color: var(--text); font-size: 14.4px; line-height: 19px; text-align: left; white-space: nowrap; cursor: default; }
 .menu button:hover, .menu button:focus-visible, .menu button[aria-checked="true"] { background: rgba(255, 205, 115, .18); outline: none; }
 .menu button[aria-checked="true"] { font-weight: 700; }
@@ -614,7 +617,7 @@ const RATES = [4, 2, 1, 0.5, 0.25], RATE_NAMES = ['1/1', '1/2', '1/4', '1/8', '1
 const STRAIGHT = 0, DOTTED = 1, TRIPLET = 2;
 const FEELS = ['Straight only', 'Straight + dotted', 'Straight + triplets'], FEEL_MENU = [DOTTED, TRIPLET, STRAIGHT];
 // Duck Rate's feel is on once a DucKy release has it (build.py's RATE_FEEL); off, Duck Rate is its five straight rows.
-const RATE_FEEL = false;
+const RATE_FEEL = true;
 /** Straight divisions, slowest first, in beats, and the rows a feel puts between them: the list as the value box shows
     it (a position, slowest first) and what each row plays. */
 function feelList(beats, names) {
@@ -2479,11 +2482,19 @@ function openMenu(anchor, items, minWidth = 0) {
   // fixed too and stays on it; anywhere else the list is on the page and scrolls with its control.
   let pinned = false;
   for (let n = anchor; n && n !== document.body && !pinned; n = n.parentElement) pinned = getComputedStyle(n).position === 'fixed';
-  if (pinned) el.style.position = 'fixed';
+  el.classList.toggle('pinned', pinned);
   document.body.append(el);
   const r = anchor.getBoundingClientRect(), [dx, dy] = pinned ? [0, 0] : [scrollX, scrollY];
+  // A list on the page opens into what the rail and the bar leave of the window, as it would go behind them.
+  let top = 0, bottom = innerHeight;
+  if (!pinned)
+    for (const bar of $$('.rail, .bar')) {
+      const b = bar.getBoundingClientRect();
+      if (!b.height || getComputedStyle(bar).display === 'none') continue;
+      if (b.top <= 0) top = Math.max(top, b.bottom); else bottom = Math.min(bottom, b.top);
+    }
   el.style.minWidth = Math.round(minWidth) + 'px';
-  const below = r.bottom + el.offsetHeight + 4 <= innerHeight || r.top < el.offsetHeight + 4;
+  const below = r.bottom + el.offsetHeight + 4 <= bottom || r.top - top < el.offsetHeight + 4;
   el.style.left = Math.round(clamp(r.left, 4, Math.max(4, innerWidth - el.offsetWidth - 4)) + dx) + 'px';
   el.style.top = Math.round((below ? r.bottom : r.top - el.offsetHeight) + dy) + 'px';
   anchor.classList.add('menu-open');
